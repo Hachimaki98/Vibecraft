@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { World } from './world.js';
 import { Player } from './player.js';
+import { WeatherSystem } from './weather.js';
 
 class Game {
     constructor() {
@@ -16,7 +17,10 @@ class Game {
         
         // Set up scene
         this.scene.background = new THREE.Color(0x87CEEB);
-        this.scene.fog = new THREE.Fog(0x87CEEB, 50, 200);
+        // Changed from THREE.Fog (linear) to THREE.FogExp2 (exponential) for WeatherSystem compatibility.
+        // Adjusted density to visually approximate original linear fog (near=50, far=200).
+        // If visual appearance is not as intended, further tuning of density or lighting may be needed.
+        this.scene.fog = new THREE.FogExp2(0x87CEEB, 0.015);
         
         // Lighting
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
@@ -42,6 +46,8 @@ class Game {
         
         // Initialize game components
         this.world = new World(this.scene);
+        this.weatherSystem = new WeatherSystem(this.scene);
+        this.weatherSystem.setWeather('sunny');
         
         // Generate initial world around spawn
         this.world.updateChunks(new THREE.Vector3(0, 0, 0));
@@ -115,6 +121,9 @@ class Game {
         
         // Keyboard block selection
         window.addEventListener('keydown', (event) => {
+            if (event.code === 'KeyR') {
+                this.weatherSystem.cycleWeather();
+            }
             const blockTypes = ['grass', 'dirt', 'stone', 'wood', 'leaves'];
             const key = parseInt(event.key);
             if (key >= 1 && key <= 5) {
@@ -330,7 +339,9 @@ class Game {
         this.player.update();
         
         // Update world chunks based on player position
-        this.world.updateChunks(this.player.controls.getObject().position);
+        const playerPos = this.player.controls.getObject().position;
+        this.world.updateChunks(playerPos);
+        this.weatherSystem.update(playerPos);
         
         this.updateUI();
         
