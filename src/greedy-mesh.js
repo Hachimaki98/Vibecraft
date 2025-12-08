@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 
 export class GreedyMesher {
-    static createMeshGeometry(blocks, blockSize = 1) {
+    static createMeshGeometry(blocks, blockSize = 1, neighborCheck = null) {
         const vertices = [];
         const normals = [];
         const uvs = [];
@@ -22,18 +22,15 @@ export class GreedyMesher {
 
         // Process each block type separately
         blocksByType.forEach((typeBlocks, type) => {
-            // Create a set for fast lookup
+            // Create a set for fast lookup of blocks within this mesh group
             const blockSet = new Set();
-            const blockMap = new Map(); // Map position to index
-            typeBlocks.forEach(({ x, y, z }, idx) => {
+            typeBlocks.forEach(({ x, y, z }) => {
                 const key = `${x},${y},${z}`;
                 blockSet.add(key);
-                blockMap.set(key, idx);
             });
 
             // Check each block for visible faces
             typeBlocks.forEach(({ x, y, z }) => {
-                const blockKey = `${x},${y},${z}`;
                 // Check each face (6 faces of a cube)
                 const faces = [
                     { dir: [0, 1, 0], corners: [[0,1,1], [1,1,1], [1,1,0], [0,1,0]] }, // top
@@ -44,14 +41,22 @@ export class GreedyMesher {
                     { dir: [0, 0, -1], corners: [[1,1,0], [1,0,0], [0,0,0], [0,1,0]] }  // back
                 ];
 
-                faces.forEach((face, faceIndex) => {
+                faces.forEach((face) => {
                     const [dx, dy, dz] = face.dir;
                     const neighborX = x + dx;
                     const neighborY = y + dy;
                     const neighborZ = z + dz;
 
                     // Face is visible if neighbor doesn't exist
-                    if (!blockSet.has(`${neighborX},${neighborY},${neighborZ}`)) {
+                    // First check internal block set (same type in same batch)
+                    let hasNeighbor = blockSet.has(`${neighborX},${neighborY},${neighborZ}`);
+                    
+                    // If not found internally, check external neighborCheck if provided
+                    if (!hasNeighbor && neighborCheck) {
+                        hasNeighbor = neighborCheck(neighborX, neighborY, neighborZ);
+                    }
+
+                    if (!hasNeighbor) {
                         // Add face vertices
                         face.corners.forEach(([cx, cy, cz]) => {
                             const px = (x + cx) * blockSize;
@@ -90,4 +95,3 @@ export class GreedyMesher {
         return geometry;
     }
 }
-

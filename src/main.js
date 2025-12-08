@@ -42,6 +42,10 @@ class Game {
         
         // Initialize game components
         this.world = new World(this.scene);
+        
+        // Generate initial world around spawn
+        this.world.updateChunks(new THREE.Vector3(0, 0, 0));
+
         this.world.onBlockAdded = (mesh) => {
             if (mesh && !mesh.userData.isOptimizedMesh) {
                 this.blockMeshes.push(mesh);
@@ -130,9 +134,11 @@ class Game {
     
     updateBlockMeshesList() {
         this.blockMeshes = [];
-        // Add all optimized meshes
-        this.world.instancedMeshes.forEach(mesh => {
-            this.blockMeshes.push(mesh);
+        // Add all chunk meshes
+        this.world.chunks.forEach(chunk => {
+            chunk.meshes.forEach(mesh => {
+                this.blockMeshes.push(mesh);
+            });
         });
         // Add all dynamic meshes
         this.world.dynamicMeshes.forEach(mesh => {
@@ -322,6 +328,10 @@ class Game {
         requestAnimationFrame(() => this.animate());
         
         this.player.update();
+        
+        // Update world chunks based on player position
+        this.world.updateChunks(this.player.controls.getObject().position);
+        
         this.updateUI();
         
         this.renderer.render(this.scene, this.camera);
