@@ -121,7 +121,6 @@ class Game {
             if (event.code === 'KeyR') {
                 this.weatherSystem.cycleWeather();
             }
-
             const blockTypes = ['grass', 'dirt', 'stone', 'wood', 'leaves'];
             const key = parseInt(event.key);
             if (key >= 1 && key <= 5) {
