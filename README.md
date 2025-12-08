@@ -18,13 +18,14 @@ A 3D voxel-based game inspired by Minecraft, built with Three.js. Features infin
 
 ## Controls
 
-- **WASD**: Move around
+- **WASD**: Move around (Rebindable)
 - **Mouse**: Look around
-- **Space**: Jump
-- **Left Shift**: Fly down (creative mode)
+- **Space**: Jump (Rebindable)
+- **Left Shift**: Fly down (creative mode) (Rebindable)
 - **Left Click**: Break block
 - **Right Click**: Place block
-- **1-5**: Select block type (Grass, Dirt, Stone, Wood, Leaves)
+- **1-5 or Scroll Wheel**: Select block type (Grass, Dirt, Stone, Wood, Leaves)
+- **Settings Menu**: Click "Settings" in top-right to rebind movement keys
 
 ## Installation
 
