@@ -36,7 +36,7 @@ export class WeatherSystem {
         rainGeo.setAttribute('velocity', new THREE.Float32BufferAttribute(rainVel, 3));
         
         const rainMat = new THREE.PointsMaterial({
-            color: 0xaaaaaa,
+            color: 0x4a90e2, // Blue
             size: 0.1,
             transparent: true,
             opacity: 0.8
