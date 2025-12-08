@@ -17,7 +17,10 @@ class Game {
         
         // Set up scene
         this.scene.background = new THREE.Color(0x87CEEB);
-        this.scene.fog = new THREE.FogExp2(0x87CEEB, 0.005);
+        // Changed from THREE.Fog (linear) to THREE.FogExp2 (exponential) for WeatherSystem compatibility.
+        // Adjusted density to visually approximate original linear fog (near=50, far=200).
+        // If visual appearance is not as intended, further tuning of density or lighting may be needed.
+        this.scene.fog = new THREE.FogExp2(0x87CEEB, 0.015);
         
         // Lighting
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
