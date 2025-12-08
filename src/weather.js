@@ -102,7 +102,7 @@ export class WeatherSystem {
         } else if (type === 'snow') {
             this.snowSystem.visible = true;
             this.scene.fog.density = 0.03; // Thickest fog
-            this.scene.fog.color.setHex(0xcccccc); // Whiteish grey
+            this.scene.fog.color.setHex(0xcccccc); // Whitish grey
             this.scene.background.setHex(0xcccccc);
         }
     }
