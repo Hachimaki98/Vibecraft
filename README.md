@@ -9,7 +9,9 @@ A 3D voxel-based game inspired by Minecraft, built with Three.js.
 - **Block Interaction**: Break and place blocks
 - **Multiple Block Types**: Grass, dirt, stone, wood, and leaves
 - **Physics**: Gravity, jumping, and collision detection
-- **Procedural Generation**: Random terrain with trees
+- **Procedural Generation**: Random terrain generation using Perlin noise - each game start creates a unique world
+- **Seeded Random Generation**: Worlds can be reproduced using seeds
+- **Natural Terrain**: Varied heights, hills, valleys, and randomly placed trees
 - **Real-time Rendering**: Smooth 3D graphics with shadows and fog
 
 ## Controls
@@ -57,15 +59,28 @@ The built files will be in the `dist` directory.
 - `main.js`: Main game loop and initialization
 - `world.js`: World generation and block management
 - `player.js`: Player movement and physics
+- `noise.js`: Perlin noise generator for procedural terrain
 - `index.html`: UI and HTML structure
+
+## Procedural Generation
+
+The game uses a Perlin noise-based procedural generation system that creates unique terrain each time you start the game. The system includes:
+
+- **Noise-based Height Maps**: Uses octave noise (fractal noise) for natural-looking terrain variation
+- **Seeded Randomness**: Each world has a seed that determines its generation (displayed in console)
+- **Layered Terrain**: Stone base, dirt middle layer, and grass top layer
+- **Random Tree Placement**: Trees are randomly placed using seeded random for consistency
+- **Variable Tree Heights**: Trees have varying heights for more natural appearance
 
 ## Future Enhancements
 
 - Inventory system
 - More block types
-- Better terrain generation (Perlin noise)
+- Biome generation (deserts, forests, mountains, etc.)
+- Cave generation
+- Ore generation
 - Multiplayer support
-- Save/load world state
+- Save/load world state with seed
 - Texture atlases for better performance
 - Chunk-based rendering for larger worlds
 - Day/night cycle
