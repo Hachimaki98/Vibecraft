@@ -14,6 +14,7 @@ export class WeatherSystem {
         // Configuration
         this.particleCount = 15000;
         this.range = 40; // Box size around player
+        this.particleVerticalRange = 20; // Vertical boundaries of weather effect relative to player
         
         this.initSystems();
     }
@@ -122,8 +123,8 @@ export class WeatherSystem {
             
             // Boundary checks relative to player to create infinite effect
             // If particle goes too far below player, move it to top
-            if (positions[i * 3 + 1] < playerPos.y - 20) {
-                positions[i * 3 + 1] = playerPos.y + 20;
+            if (positions[i * 3 + 1] < playerPos.y - this.particleVerticalRange) {
+                positions[i * 3 + 1] = playerPos.y + this.particleVerticalRange;
                 positions[i * 3] = playerPos.x + (Math.random() - 0.5) * this.range;
                 positions[i * 3 + 2] = playerPos.z + (Math.random() - 0.5) * this.range;
             }
