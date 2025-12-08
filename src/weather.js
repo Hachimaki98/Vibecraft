@@ -140,9 +140,5 @@ export class WeatherSystem {
         
         activeSystem.geometry.attributes.position.needsUpdate = true;
         
-        // Move the entire system container to follow rough area of player? 
-        // No, we are updating individual particles relative to player. 
-        // But we need to make sure the initial positions are near the player if we just switched.
-        // Actually, the wrap logic handles it, but might take a frame to snap.
     }
 }
