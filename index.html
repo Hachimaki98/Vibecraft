@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minecraft-like Block Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            overflow: hidden;
+            font-family: 'Courier New', monospace;
+        }
+        
+        #game-canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            pointer-events: none;
+            z-index: 100;
+        }
+        
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            pointer-events: none;
+            z-index: 100;
+        }
+        
+        #crosshair::before,
+        #crosshair::after {
+            content: '';
+            position: absolute;
+            background: white;
+            box-shadow: 0 0 2px black;
+        }
+        
+        #crosshair::before {
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            transform: translateY(-50%);
+        }
+        
+        #crosshair::after {
+            left: 50%;
+            top: 0;
+            width: 2px;
+            height: 100%;
+            transform: translateX(-50%);
+        }
+        
+        #instructions {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            pointer-events: none;
+            z-index: 100;
+            line-height: 1.6;
+        }
+        
+        #block-selector {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            z-index: 100;
+        }
+        
+        .block-option {
+            width: 50px;
+            height: 50px;
+            border: 3px solid white;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .block-option:hover {
+            transform: scale(1.1);
+        }
+        
+        .block-option.active {
+            border-color: yellow;
+            box-shadow: 0 0 10px yellow;
+        }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <div>FPS: <span id="fps">0</span></div>
+        <div>Position: <span id="position">0, 0, 0</span></div>
+        <div>Blocks: <span id="blocks">0</span></div>
+    </div>
+    
+    <div id="crosshair"></div>
+    
+    <div id="instructions">
+        <div><strong>Controls:</strong></div>
+        <div>WASD - Move | SPACE - Jump | SHIFT - Fly Down</div>
+        <div>Mouse - Look Around | Left Click - Break Block</div>
+        <div>Right Click - Place Block | 1-5 - Select Block Type</div>
+        <div>Click to start playing!</div>
+    </div>
+    
+    <div id="block-selector">
+        <div class="block-option active" data-block="grass" style="background: linear-gradient(to bottom, #5a8c3a 0%, #5a8c3a 80%, #8b7355 80%, #8b7355 100%);"></div>
+        <div class="block-option" data-block="dirt" style="background: #8b7355;"></div>
+        <div class="block-option" data-block="stone" style="background: #888888;"></div>
+        <div class="block-option" data-block="wood" style="background: #8b5a2b;"></div>
+        <div class="block-option" data-block="leaves" style="background: #2d5016;"></div>
+    </div>
+    
+    <script type="module" src="/src/main.js"></script>
+</body>
+</html>

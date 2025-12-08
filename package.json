@@ -1,0 +1,21 @@
+{
+  "name": "minecraft-game",
+  "version": "1.0.0",
+  "description": "A Minecraft-like block-based voxel game",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": ["minecraft", "voxel", "game", "3d"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "three": "^0.160.0"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  }
+}
