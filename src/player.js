@@ -101,9 +101,18 @@ export class Player {
     }
     
     setKeyBinding(action, keyCode) {
-        if (this.keyBindings.hasOwnProperty(action)) {
-            this.keyBindings[action] = keyCode;
+        if (!this.keyBindings.hasOwnProperty(action)) {
+            return false;
         }
+        // Prevent duplicate key bindings
+        for (const [otherAction, otherKey] of Object.entries(this.keyBindings)) {
+            if (otherAction !== action && otherKey === keyCode) {
+                // Key code already assigned to another action
+                return false;
+            }
+        }
+        this.keyBindings[action] = keyCode;
+        return true;
     }
 
     getKeyBindings() {
