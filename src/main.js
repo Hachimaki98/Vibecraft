@@ -181,6 +181,7 @@ class Game {
         closeSettings.addEventListener('click', () => {
             settingsMenu.style.display = 'none';
             this.player.lock();
+            this.currentRemapAction = null;
         });
 
         // Key remapping logic
