@@ -26,6 +26,16 @@ export class Player {
         this.moveUp = false;
         this.moveDown = false;
         
+        // Key bindings
+        this.keyBindings = {
+            forward: 'KeyW',
+            backward: 'KeyS',
+            left: 'KeyA',
+            right: 'KeyD',
+            jump: 'Space',
+            down: 'ShiftLeft'
+        };
+
         // Player dimensions
         this.height = 1.7;
         this.radius = 0.3;
@@ -42,25 +52,25 @@ export class Player {
     setupControls() {
         const onKeyDown = (event) => {
             switch (event.code) {
-                case 'KeyW':
+                case this.keyBindings.forward:
                     this.moveForward = true;
                     break;
-                case 'KeyS':
+                case this.keyBindings.backward:
                     this.moveBackward = true;
                     break;
-                case 'KeyA':
+                case this.keyBindings.left:
                     this.moveLeft = true;
                     break;
-                case 'KeyD':
+                case this.keyBindings.right:
                     this.moveRight = true;
                     break;
-                case 'Space':
+                case this.keyBindings.jump:
                     if (this.canJump) {
                         this.velocity.y = this.jumpVelocity;
                         this.canJump = false;
                     }
                     break;
-                case 'ShiftLeft':
+                case this.keyBindings.down:
                     this.moveDown = true;
                     break;
             }
@@ -68,19 +78,19 @@ export class Player {
         
         const onKeyUp = (event) => {
             switch (event.code) {
-                case 'KeyW':
+                case this.keyBindings.forward:
                     this.moveForward = false;
                     break;
-                case 'KeyS':
+                case this.keyBindings.backward:
                     this.moveBackward = false;
                     break;
-                case 'KeyA':
+                case this.keyBindings.left:
                     this.moveLeft = false;
                     break;
-                case 'KeyD':
+                case this.keyBindings.right:
                     this.moveRight = false;
                     break;
-                case 'ShiftLeft':
+                case this.keyBindings.down:
                     this.moveDown = false;
                     break;
             }
@@ -90,6 +100,25 @@ export class Player {
         document.addEventListener('keyup', onKeyUp);
     }
     
+    setKeyBinding(action, keyCode) {
+        if (!this.keyBindings.hasOwnProperty(action)) {
+            return false;
+        }
+        // Prevent duplicate key bindings
+        for (const [otherAction, otherKey] of Object.entries(this.keyBindings)) {
+            if (otherAction !== action && otherKey === keyCode) {
+                // Key code already assigned to another action
+                return false;
+            }
+        }
+        this.keyBindings[action] = keyCode;
+        return true;
+    }
+
+    getKeyBindings() {
+        return { ...this.keyBindings };
+    }
+
     lock() {
         this.controls.lock();
     }

@@ -78,7 +78,9 @@ class Game {
         }
         
         // Selected block type
+        this.blockTypes = ['grass', 'dirt', 'stone', 'wood', 'leaves'];
         this.selectedBlock = 'grass';
+        this.selectedBlockIndex = 0;
         
         // FPS counter
         this.frameCount = 0;
@@ -87,6 +89,7 @@ class Game {
         
         // Event listeners
         this.setupEventListeners();
+        this.setupSettings();
         
         // Start game loop
         this.animate();
@@ -94,7 +97,13 @@ class Game {
     
     setupEventListeners() {
         window.addEventListener('resize', () => this.onWindowResize());
-        window.addEventListener('click', () => this.player.lock());
+        window.addEventListener('click', (event) => {
+            // Don't lock if clicking inside settings menu or settings button
+            if (event.target.closest('#settings-menu') || event.target.closest('#settings-button')) {
+                return;
+            }
+            this.player.lock();
+        });
         
         window.addEventListener('mousedown', (event) => {
             if (this.player.controls.isLocked) {
@@ -124,17 +133,102 @@ class Game {
             if (event.code === 'KeyR') {
                 this.weatherSystem.cycleWeather();
             }
-            const blockTypes = ['grass', 'dirt', 'stone', 'wood', 'leaves'];
             const key = parseInt(event.key);
             if (key >= 1 && key <= 5) {
-                this.selectedBlock = blockTypes[key - 1];
-                document.querySelectorAll('.block-option').forEach((opt, idx) => {
-                    opt.classList.toggle('active', idx === key - 1);
-                });
+                this.selectBlock(key - 1);
             }
+        });
+
+        // Scroll wheel block selection
+        window.addEventListener('wheel', (event) => {
+            if (event.deltaY > 0) {
+                // Scroll down
+                this.selectedBlockIndex = (this.selectedBlockIndex + 1) % this.blockTypes.length;
+            } else {
+                // Scroll up
+                this.selectedBlockIndex = (this.selectedBlockIndex - 1 + this.blockTypes.length) % this.blockTypes.length;
+            }
+            this.selectBlock(this.selectedBlockIndex);
         });
     }
     
+    selectBlock(index) {
+        this.selectedBlockIndex = index;
+        this.selectedBlock = this.blockTypes[index];
+        document.querySelectorAll('.block-option').forEach((opt, idx) => {
+            opt.classList.toggle('active', idx === index);
+        });
+    }
+    
+    setupSettings() {
+        const settingsButton = document.getElementById('settings-button');
+        const settingsMenu = document.getElementById('settings-menu');
+        const closeSettings = document.getElementById('close-settings');
+
+        // Toggle settings menu
+        settingsButton.addEventListener('click', () => {
+            const isVisible = settingsMenu.style.display === 'block';
+            if (!isVisible) {
+                // Open menu
+                this.player.controls.unlock();
+                settingsMenu.style.display = 'block';
+                this.updateControlsList();
+            }
+        });
+
+        // Close settings menu
+        closeSettings.addEventListener('click', () => {
+            settingsMenu.style.display = 'none';
+            this.player.lock();
+            this.currentRemapAction = null;
+        });
+
+        // Key remapping logic
+        this.currentRemapAction = null;
+        
+        window.addEventListener('keydown', (e) => {
+            if (this.currentRemapAction) {
+                e.preventDefault();
+                this.player.setKeyBinding(this.currentRemapAction, e.code);
+                this.currentRemapAction = null;
+                this.updateControlsList();
+            }
+        });
+    }
+
+    updateControlsList() {
+        const controlsList = document.getElementById('controls-list');
+        controlsList.innerHTML = '';
+        
+        const bindings = this.player.getKeyBindings();
+        
+        for (const [action, code] of Object.entries(bindings)) {
+            const row = document.createElement('div');
+            row.className = 'setting-row';
+            
+            const label = document.createElement('span');
+            label.textContent = action.charAt(0).toUpperCase() + action.slice(1);
+            
+            const btn = document.createElement('button');
+            btn.className = 'key-btn';
+            btn.textContent = code;
+            
+            btn.addEventListener('click', () => {
+                // Cancel any previous remapping
+                document.querySelectorAll('.key-btn').forEach(b => b.classList.remove('waiting'));
+                
+                // Set waiting state
+                btn.textContent = 'Press key...';
+                btn.classList.add('waiting');
+                this.currentRemapAction = action;
+            });
+            
+            row.appendChild(label);
+            row.appendChild(btn);
+            controlsList.appendChild(row);
+        }
+    }
+
     onWindowResize() {
         this.camera.aspect = window.innerWidth / window.innerHeight;
         this.camera.updateProjectionMatrix();
