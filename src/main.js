@@ -36,6 +36,8 @@ class Game {
         directionalLight.shadow.mapSize.width = 2048;
         directionalLight.shadow.mapSize.height = 2048;
         this.scene.add(directionalLight);
+        this.sunLight = directionalLight;
+        this.scene.add(directionalLight.target);
         
         // Raycaster for block interaction
         this.raycaster = new THREE.Raycaster();
@@ -46,7 +48,7 @@ class Game {
         
         // Initialize game components
         this.world = new World(this.scene);
-        this.weatherSystem = new WeatherSystem(this.scene);
+        this.weatherSystem = new WeatherSystem(this.scene, this.world);
         this.weatherSystem.setWeather('sunny');
         
         // Generate initial world around spawn
@@ -72,13 +74,13 @@ class Game {
         const spawnZ = 0;
         const highestBlock = this.world.getHighestBlockAt(spawnX, spawnZ);
         if (highestBlock >= 0) {
-            // Block center is at highestBlock, top is at highestBlock + 0.5
+            // Block occupies [y, y+1), so top is at highestBlock + 1
             // Player feet should be at top, so player center = top + height
-            this.player.controls.getObject().position.set(spawnX, highestBlock + 0.5 + this.player.height, spawnZ);
+            this.player.controls.getObject().position.set(spawnX, highestBlock + 1 + this.player.height, spawnZ);
         }
         
-        // Selected block type
-        this.blockTypes = ['grass', 'dirt', 'stone', 'wood', 'leaves'];
+        // Selected block type - must match order of block-option elements in HTML
+        this.blockTypes = ['grass', 'dirt', 'stone', 'wood', 'leaves', 'sand', 'glass', 'brick', 'plank', 'water'];
         this.selectedBlock = 'grass';
         this.selectedBlockIndex = 0;
         
@@ -134,8 +136,10 @@ class Game {
                 this.weatherSystem.cycleWeather();
             }
             const key = parseInt(event.key);
-            if (key >= 1 && key <= 5) {
+            if (key >= 1 && key <= 9) {
                 this.selectBlock(key - 1);
+            } else if (event.key === '0') {
+                this.selectBlock(9); // 0 key selects 10th block
             }
         });
 
@@ -248,6 +252,28 @@ class Game {
             this.blockMeshes.push(mesh);
         });
     }
+
+    getNearbyMeshes(radius = 2) {
+        const meshes = [];
+        const playerPos = this.player.controls.getObject().position;
+        const cx = Math.floor(playerPos.x / this.world.chunkSize);
+        const cz = Math.floor(playerPos.z / this.world.chunkSize);
+
+        for (let x = cx - radius; x <= cx + radius; x++) {
+            for (let z = cz - radius; z <= cz + radius; z++) {
+                const key = this.world.getChunkKey(x, z);
+                const chunk = this.world.chunks.get(key);
+                if (chunk) {
+                    chunk.meshes.forEach(mesh => meshes.push(mesh));
+                }
+            }
+        }
+        // Add dynamic meshes (usually few)
+        this.world.dynamicMeshes.forEach(mesh => {
+            meshes.push(mesh);
+        });
+        return meshes;
+    }
     
     getBlockPositionFromIntersection(intersect) {
         // If mesh has position data, use it (dynamic meshes)
@@ -282,21 +308,20 @@ class Game {
         // Fallback: calculate block position from intersection point
         const point = intersect.point;
         
-        // Blocks are centered at integer coordinates (0, 1, 2, etc.)
+        // Blocks occupy the space [x, x+1) x [y, y+1) x [z, z+1)
         // The intersection point is on the surface, so we need to determine which block
-        // contains this point. Since blocks are 1x1x1, we can use floor/ceil.
+        // contains this point by moving slightly into the block and using floor.
         const normal = intersect.face ? intersect.face.normal.clone().normalize() : new THREE.Vector3(0, 1, 0);
         
         // Move point slightly inward (opposite of normal direction) to get inside the block
         // This ensures we're definitely inside the block, not on the surface
-        const offset = 0.15;
+        const offset = 0.01;
         const blockPoint = point.clone().add(normal.clone().multiplyScalar(-offset));
         
-        // Round to nearest integer - blocks are at integer coordinates
-        // Use Math.round for proper rounding in both positive and negative directions
-        const x = Math.round(blockPoint.x);
-        const y = Math.round(blockPoint.y);
-        const z = Math.round(blockPoint.z);
+        // Use floor since blocks occupy [x, x+1) ranges
+        const x = Math.floor(blockPoint.x);
+        const y = Math.floor(blockPoint.y);
+        const z = Math.floor(blockPoint.z);
         
         return { x, y, z };
     }
@@ -305,8 +330,8 @@ class Game {
         const center = new THREE.Vector2(0, 0);
         this.raycaster.setFromCamera(center, this.camera);
         
-        this.updateBlockMeshesList();
-        const intersects = this.raycaster.intersectObjects(this.blockMeshes, true);
+        const meshes = this.getNearbyMeshes();
+        const intersects = this.raycaster.intersectObjects(meshes, true);
         
         if (intersects.length > 0) {
             const intersect = intersects[0];
@@ -315,7 +340,7 @@ class Game {
             // Verify block exists at this position
             if (this.world.isBlockAt(blockPos.x, blockPos.y, blockPos.z)) {
                 this.world.removeBlock(blockPos.x, blockPos.y, blockPos.z);
-                this.updateBlockMeshesList();
+                // No need to update global mesh list
             }
         }
     }
@@ -324,8 +349,8 @@ class Game {
         const center = new THREE.Vector2(0, 0);
         this.raycaster.setFromCamera(center, this.camera);
         
-        this.updateBlockMeshesList();
-        const intersects = this.raycaster.intersectObjects(this.blockMeshes, true);
+        const meshes = this.getNearbyMeshes();
+        const intersects = this.raycaster.intersectObjects(meshes, true);
         
         if (intersects.length > 0) {
             const intersect = intersects[0];
@@ -402,7 +427,7 @@ class Game {
         
         if (distance > 1.5) {
             this.world.addBlock(x, y, z, this.selectedBlock);
-            this.updateBlockMeshesList();
+            // No need to update global mesh list
         }
     }
     
@@ -437,6 +462,12 @@ class Game {
         this.world.updateChunks(playerPos);
         this.weatherSystem.update(playerPos);
         
+        // Update sunlight position to follow player
+        if (this.sunLight) {
+            this.sunLight.position.set(playerPos.x + 50, playerPos.y + 100, playerPos.z + 50);
+            this.sunLight.target.position.set(playerPos.x, playerPos.y, playerPos.z);
+        }
+
         this.updateUI();
         
         this.renderer.render(this.scene, this.camera);

@@ -1,85 +1,211 @@
-// Greedy meshing algorithm to combine adjacent block faces
-// This reduces geometry by only rendering visible faces
 import * as THREE from 'three';
 
 export class GreedyMesher {
-    static createMeshGeometry(blocks, blockSize = 1, neighborCheck = null) {
+    static createMeshGeometry(blocks, blockSize = 1, neighborCheck = null, isHalfHeight = false) {
+        if (blocks.length === 0) return new THREE.BufferGeometry();
+        
+        const blockHeight = isHalfHeight ? 0.5 : 1.0;
+
+        // 1. Determine bounds
+        let minX = Infinity, minY = Infinity, minZ = Infinity;
+        let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+        
+        const blockSet = new Set();
+        blocks.forEach(b => {
+            minX = Math.min(minX, b.x); minY = Math.min(minY, b.y); minZ = Math.min(minZ, b.z);
+            maxX = Math.max(maxX, b.x); maxY = Math.max(maxY, b.y); maxZ = Math.max(maxZ, b.z);
+            blockSet.add(`${b.x},${b.y},${b.z}`);
+        });
+
         const vertices = [];
         const normals = [];
         const uvs = [];
         const indices = [];
-        const blockIds = []; // Store which block each vertex belongs to
         let vertexOffset = 0;
 
-        // Create a set for fast lookup of blocks within this mesh
-        const blockSet = new Set();
-        blocks.forEach(({ x, y, z }) => {
-            const key = `${x},${y},${z}`;
-            blockSet.add(key);
-        });
+        const faces = [
+            { dir: [0, 1, 0], u: 0, v: 2, name: 'top' },    // y+ (u=x, v=z)
+            { dir: [0, -1, 0], u: 0, v: 2, name: 'bottom' }, // y-
+            { dir: [1, 0, 0], u: 2, v: 1, name: 'right' },  // x+ (u=z, v=y)
+            { dir: [-1, 0, 0], u: 2, v: 1, name: 'left' },  // x-
+            { dir: [0, 0, 1], u: 0, v: 1, name: 'front' },  // z+ (u=x, v=y)
+            { dir: [0, 0, -1], u: 0, v: 1, name: 'back' }   // z-
+        ];
 
-        // Check each block for visible faces
-        blocks.forEach(({ x, y, z }) => {
-            // Check each face (6 faces of a cube)
-            const faces = [
-                { dir: [0, 1, 0], corners: [[0,1,1], [1,1,1], [1,1,0], [0,1,0]] }, // top
-                { dir: [0, -1, 0], corners: [[0,0,0], [1,0,0], [1,0,1], [0,0,1]] }, // bottom
-                { dir: [1, 0, 0], corners: [[1,1,0], [1,1,1], [1,0,1], [1,0,0]] }, // right
-                { dir: [-1, 0, 0], corners: [[0,1,1], [0,1,0], [0,0,0], [0,0,1]] }, // left
-                { dir: [0, 0, 1], corners: [[0,1,1], [0,0,1], [1,0,1], [1,1,1]] }, // front
-                { dir: [0, 0, -1], corners: [[1,1,0], [1,0,0], [0,0,0], [0,1,0]] }  // back
-            ];
+        const hasBlock = (x, y, z) => blockSet.has(`${x},${y},${z}`);
 
-            faces.forEach((face) => {
-                const [dx, dy, dz] = face.dir;
-                const neighborX = x + dx;
-                const neighborY = y + dy;
-                const neighborZ = z + dz;
+        for (const face of faces) {
+            const [dx, dy, dz] = face.dir;
+            const uAxis = face.u;
+            const vAxis = face.v;
+            const dAxis = 3 - uAxis - vAxis; 
+            
+            const minU = uAxis === 0 ? minX : (uAxis === 1 ? minY : minZ);
+            const maxU = uAxis === 0 ? maxX : (uAxis === 1 ? maxY : maxZ);
+            const minV = vAxis === 0 ? minX : (vAxis === 1 ? minY : minZ);
+            const maxV = vAxis === 0 ? maxX : (vAxis === 1 ? maxY : maxZ);
+            const minD = dAxis === 0 ? minX : (dAxis === 1 ? minY : minZ);
+            const maxD = dAxis === 0 ? maxX : (dAxis === 1 ? maxY : maxZ);
 
-                // Face is visible if neighbor doesn't exist
-                // First check internal block set (same type in same batch)
-                let hasNeighbor = blockSet.has(`${neighborX},${neighborY},${neighborZ}`);
+            for (let d = minD; d <= maxD; d++) {
+                // mask[u][v] = boolean
+                const mask = new Map();
+
+                for (let u = minU; u <= maxU; u++) {
+                    for (let v = minV; v <= maxV; v++) {
+                        let x, y, z;
+                        const coords = [0, 0, 0];
+                        coords[dAxis] = d;
+                        coords[uAxis] = u;
+                        coords[vAxis] = v;
+                        
+                        x = coords[0];
+                        y = coords[1];
+                        z = coords[2];
+
+                        if (hasBlock(x, y, z)) {
+                            const nx = x + dx, ny = y + dy, nz = z + dz;
+                            
+                            let visible = true;
+                            // Check internal occlusion (same chunk/same type)
+                            if (hasBlock(nx, ny, nz)) {
+                                visible = false;
+                            } else if (neighborCheck) {
+                                // External occlusion
+                                // neighborCheck returns true if face should be culled
+                                if (neighborCheck(nx, ny, nz)) {
+                                    visible = false;
+                                }
+                            }
+
+                            if (visible) {
+                                mask.set(`${u},${v}`, { x, y, z });
+                            }
+                        }
+                    }
+                }
+
+                // Greedy mesh
+                const processed = new Set();
                 
-                // If not found internally, check external neighborCheck if provided
-                if (!hasNeighbor && neighborCheck) {
-                    hasNeighbor = neighborCheck(neighborX, neighborY, neighborZ);
+                for (let v = minV; v <= maxV; v++) {
+                    for (let u = minU; u <= maxU; u++) {
+                        if (mask.has(`${u},${v}`) && !processed.has(`${u},${v}`)) {
+                            const startU = u;
+                            const startV = v;
+                            
+                            // Width
+                            let width = 1;
+                            while (mask.has(`${u + width},${v}`) && !processed.has(`${u + width},${v}`) && (u + width <= maxU)) {
+                                width++;
+                            }
+
+                            // Height
+                            let height = 1;
+                            let canExtend = true;
+                            while (canExtend && (v + height <= maxV)) {
+                                for (let k = 0; k < width; k++) {
+                                    if (!mask.has(`${u + k},${v + height}`) || processed.has(`${u + k},${v + height}`)) {
+                                        canExtend = false;
+                                        break;
+                                    }
+                                }
+                                if (canExtend) height++;
+                            }
+
+                            // Mark processed
+                            for (let h = 0; h < height; h++) {
+                                for (let w = 0; w < width; w++) {
+                                    processed.add(`${u + w},${v + h}`);
+                                }
+                            }
+
+                            // Add Quad
+                            addQuad(
+                                u, v, width, height,
+                                d, dAxis, uAxis, vAxis,
+                                dx, dy, dz,
+                                blockSize,
+                                vertices, normals, uvs, indices,
+                                vertexOffset,
+                                blockHeight
+                            );
+                            vertexOffset += 4;
+                        }
+                    }
                 }
-
-                if (!hasNeighbor) {
-                    // Add face vertices
-                    face.corners.forEach(([cx, cy, cz]) => {
-                        const px = (x + cx) * blockSize;
-                        const py = (y + cy) * blockSize;
-                        const pz = (z + cz) * blockSize;
-
-                        vertices.push(px, py, pz);
-                        normals.push(...face.dir);
-                        uvs.push(cx, cy);
-                        // Store block position for each vertex
-                        blockIds.push(x, y, z);
-                    });
-
-                    // Add face indices (two triangles)
-                    const base = vertexOffset;
-                    indices.push(
-                        base, base + 1, base + 2,
-                        base, base + 2, base + 3
-                    );
-                    vertexOffset += 4;
-                }
-            });
-        });
-
+            }
+        }
+        
         const geometry = new THREE.BufferGeometry();
         geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
         geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
         geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
         geometry.setIndex(indices);
-        
-        // Store block IDs as custom attribute for raycasting
-        geometry.setAttribute('blockId', new THREE.Float32BufferAttribute(blockIds, 3));
         geometry.computeBoundingSphere();
 
         return geometry;
+    }
+}
+
+function addQuad(u, v, width, height, d, dAxis, uAxis, vAxis, nx, ny, nz, blockSize, vertices, normals, uvs, indices, baseIndex, blockHeight = 1.0) {
+    // Determine face offset
+    let dPos = d;
+    if (nx > 0 || ny > 0 || nz > 0) {
+        // For half-height blocks, the top face (ny > 0) should be at d + blockHeight
+        if (ny > 0) {
+            dPos += blockHeight;
+        } else {
+            dPos += 1;
+        }
+    }
+
+    const corners = [
+        { u: 0, v: 0 },
+        { u: width, v: 0 },
+        { u: width, v: height },
+        { u: 0, v: height }
+    ];
+
+    corners.forEach(c => {
+        const pos = [0, 0, 0];
+        pos[dAxis] = dPos;
+        pos[uAxis] = u + c.u;
+        pos[vAxis] = v + c.v;
+        
+        // For side faces of half-height blocks, scale the Y component
+        // Side faces have vAxis = 1 (Y axis), and we need to scale the v dimension
+        if (blockHeight < 1.0 && vAxis === 1) {
+            // Scale the v (Y) coordinate by blockHeight
+            pos[vAxis] = v + c.v * blockHeight;
+        }
+        
+        vertices.push(pos[0] * blockSize, pos[1] * blockSize, pos[2] * blockSize);
+        normals.push(nx, ny, nz);
+        
+        // UVs - repeat texture (scale v for half-height side faces)
+        if (blockHeight < 1.0 && vAxis === 1) {
+            uvs.push(c.u, c.v * blockHeight);
+        } else {
+            uvs.push(c.u, c.v);
+        }
+    });
+
+    // Check winding order
+    // +X (Right), +Y (Top), -Z (Back) need reverse winding for standard UV-axis mapping
+    const reversed = (nx > 0 && ny === 0 && nz === 0) || 
+                     (nx === 0 && ny > 0 && nz === 0) || 
+                     (nx === 0 && ny === 0 && nz < 0);
+    
+    if (reversed) {
+        indices.push(
+            baseIndex, baseIndex + 2, baseIndex + 1,
+            baseIndex, baseIndex + 3, baseIndex + 2
+        );
+    } else {
+        indices.push(
+            baseIndex, baseIndex + 1, baseIndex + 2,
+            baseIndex, baseIndex + 2, baseIndex + 3
+        );
     }
 }

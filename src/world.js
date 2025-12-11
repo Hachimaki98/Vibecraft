@@ -48,7 +48,11 @@ export class World {
         };
         
         this.transparentBlocks = new Set(['leaves', 'glass', 'water', 'ornament_red', 'ornament_blue', 'ornament_gold']);
+        this.halfHeightBlocks = new Set(['snow']);
         
+        this.lastChunkX = null;
+        this.lastChunkZ = null;
+
         // Initial generation will happen via updateChunks
         console.log(`World initialized with seed: ${this.seed}`);
     }
@@ -56,6 +60,12 @@ export class World {
     updateChunks(playerPos) {
         const cx = Math.floor(playerPos.x / this.chunkSize);
         const cz = Math.floor(playerPos.z / this.chunkSize);
+
+        if (this.lastChunkX === cx && this.lastChunkZ === cz) {
+            return;
+        }
+        this.lastChunkX = cx;
+        this.lastChunkZ = cz;
 
         // Generate/load chunks around player
         for (let x = cx - this.renderDistance; x <= cx + this.renderDistance; x++) {
@@ -310,9 +320,10 @@ export class World {
                 // If neighbor is same type, cull face (internal face) -> Hide it
                 if (neighborBlock.type === type) return true;
                 
+                // If neighbor is a half-height block, don't cull - they don't fully occlude
+                if (this.halfHeightBlocks.has(neighborBlock.type)) return false;
+                
                 // If neighbor is opaque, it blocks view -> Hide face
-                // (Unless current block is also opaque? No, opaque vs opaque is covered by neighborBlock logic mostly, 
-                // but strictly: Stone vs Dirt -> Stone face hidden by Dirt? Yes.)
                 if (!this.transparentBlocks.has(neighborBlock.type)) return true;
                 
                 // If neighbor is transparent (and different type), we can see through it -> Keep face
@@ -320,7 +331,8 @@ export class World {
                 return false;
             };
 
-            const geometry = GreedyMesher.createMeshGeometry(typeBlocks, this.blockSize, neighborCheck);
+            const isHalfHeight = this.halfHeightBlocks.has(type);
+            const geometry = GreedyMesher.createMeshGeometry(typeBlocks, this.blockSize, neighborCheck, isHalfHeight);
             
             if (geometry.attributes.position.count > 0) {
                 const material = this.materials[type];

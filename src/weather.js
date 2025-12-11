@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 
 export class WeatherSystem {
-    constructor(scene) {
+    constructor(scene, world = null) {
         this.scene = scene;
+        this.world = world;
         this.weatherTypes = ['sunny', 'rain', 'snow'];
         this.currentWeatherIndex = 0;
         this.currentWeather = 'sunny';
@@ -16,7 +17,26 @@ export class WeatherSystem {
         this.range = 40; // Box size around player
         this.particleVerticalRange = 20; // Vertical boundaries of weather effect relative to player
         
+        // Snow accumulation settings
+        this.snowAccumulationRadius = 20; // Radius around player to accumulate snow
+        this.snowAccumulationInterval = 100; // ms between accumulation attempts
+        this.snowBlocksPerTick = 3; // Number of snow blocks to try placing per tick
+        this.lastAccumulationTime = 0;
+        this.accumulatedSnowPositions = new Set(); // Track where we've added snow
+        
+        // Snow melting settings
+        this.snowMeltInterval = 200; // ms between melt attempts (slower than accumulation)
+        this.snowMeltPerTick = 2; // Number of snow blocks to melt per tick
+        this.lastMeltTime = 0;
+        
+        // Block types that snow can accumulate on
+        this.snowableBlocks = new Set(['grass', 'dirt', 'stone', 'leaves', 'sand', 'wood', 'plank', 'brick']);
+        
         this.initSystems();
+    }
+    
+    setWorld(world) {
+        this.world = world;
     }
     
     initSystems() {
@@ -109,7 +129,11 @@ export class WeatherSystem {
     }
     
     update(playerPos) {
-        if (this.currentWeather === 'sunny') return;
+        // Melt snow when sunny
+        if (this.currentWeather === 'sunny') {
+            this.meltSnow(playerPos);
+            return;
+        }
         
         const activeSystem = this.currentWeather === 'rain' ? this.rainSystem : this.snowSystem;
         const positions = activeSystem.geometry.attributes.position.array;
@@ -141,5 +165,95 @@ export class WeatherSystem {
         
         activeSystem.geometry.attributes.position.needsUpdate = true;
         
+        // Accumulate snow during snowy weather
+        if (this.currentWeather === 'snow') {
+            this.accumulateSnow(playerPos);
+        }
+    }
+    
+    accumulateSnow(playerPos) {
+        if (!this.world) return;
+        
+        const now = performance.now();
+        if (now - this.lastAccumulationTime < this.snowAccumulationInterval) return;
+        this.lastAccumulationTime = now;
+        
+        const radius = this.snowAccumulationRadius;
+        const playerX = Math.floor(playerPos.x);
+        const playerZ = Math.floor(playerPos.z);
+        
+        // Try to place a few snow blocks per tick
+        let placed = 0;
+        const maxAttempts = this.snowBlocksPerTick * 10; // Allow more attempts to find valid spots
+        
+        for (let attempt = 0; attempt < maxAttempts && placed < this.snowBlocksPerTick; attempt++) {
+            // Pick a random position within radius
+            const x = playerX + Math.floor((Math.random() - 0.5) * radius * 2);
+            const z = playerZ + Math.floor((Math.random() - 0.5) * radius * 2);
+            
+            // Find the highest block at this x,z
+            const highestY = this.world.getHighestBlockAt(x, z);
+            if (highestY < 0) continue;
+            
+            const block = this.world.getBlock(x, highestY, z);
+            if (!block) continue;
+            
+            // Don't place snow on water or existing snow
+            if (block.type === 'water' || block.type === 'snow') continue;
+            
+            // Check if this is a snowable block type
+            if (!this.snowableBlocks.has(block.type)) continue;
+            
+            // Position for the snow block (on top of the highest block)
+            const snowY = highestY + 1;
+            const snowKey = `${x},${snowY},${z}`;
+            
+            // Don't place if we already placed snow here
+            if (this.accumulatedSnowPositions.has(snowKey)) continue;
+            
+            // Don't place if there's already a block there
+            if (this.world.isBlockAt(x, snowY, z)) continue;
+            
+            // Place snow block
+            this.world.addBlock(x, snowY, z, 'snow');
+            this.accumulatedSnowPositions.add(snowKey);
+            placed++;
+        }
+    }
+    
+    meltSnow(playerPos) {
+        if (!this.world) return;
+        if (this.accumulatedSnowPositions.size === 0) return;
+        
+        const now = performance.now();
+        if (now - this.lastMeltTime < this.snowMeltInterval) return;
+        this.lastMeltTime = now;
+        
+        // Convert set to array for random access
+        const snowPositions = Array.from(this.accumulatedSnowPositions);
+        
+        // Melt a few snow blocks per tick
+        const toMelt = Math.min(this.snowMeltPerTick, snowPositions.length);
+        
+        for (let i = 0; i < toMelt; i++) {
+            // Pick a random snow position to melt
+            const randomIndex = Math.floor(Math.random() * snowPositions.length);
+            const snowKey = snowPositions[randomIndex];
+            
+            // Parse position from key
+            const [x, y, z] = snowKey.split(',').map(Number);
+            
+            // Verify it's still a snow block (player might have broken it)
+            const block = this.world.getBlock(x, y, z);
+            if (block && block.type === 'snow') {
+                this.world.removeBlock(x, y, z);
+            }
+            
+            // Remove from tracking
+            this.accumulatedSnowPositions.delete(snowKey);
+            
+            // Remove from our working array to avoid picking it again this tick
+            snowPositions.splice(randomIndex, 1);
+        }
     }
 }

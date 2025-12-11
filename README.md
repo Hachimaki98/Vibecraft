@@ -8,13 +8,16 @@ A 3D voxel-based game inspired by Minecraft, built with Three.js. Features infin
 - **Chunk-Based Generation**: Terrain is generated and loaded in chunks for optimal performance.
 - **First-Person Controls**: WASD movement with mouse look.
 - **Block Interaction**: Break and place blocks dynamically.
-- **Multiple Block Types**: Grass, dirt, stone, wood, and leaves.
+- **Multiple Block Types**: 10 block types including grass, dirt, stone, wood, leaves, sand, glass, brick, plank, and water.
 - **Physics**: Gravity, jumping, and robust collision detection.
 - **Procedural Generation**: Random terrain generation using Perlin noise - each game start creates a unique world.
 - **Seeded Random Generation**: Worlds can be reproduced using seeds.
 - **Natural Terrain**: Varied heights, hills, valleys, and randomly placed trees.
 - **GPU-Optimized Rendering**: Greedy meshing algorithm reduces geometry by 50-70% and draw calls by 99%+.
 - **Real-time Rendering**: Smooth 3D graphics with shadows and fog.
+- **Dynamic Weather System**: Cycle through sunny, rain, and snow weather with R key.
+- **Snow Accumulation**: During snowy weather, snow gradually accumulates on exposed surfaces and trees as half-height blocks.
+- **Snow Melting**: When weather returns to sunny, accumulated snow slowly melts away.
 
 ## Controls
 
@@ -24,7 +27,8 @@ A 3D voxel-based game inspired by Minecraft, built with Three.js. Features infin
 - **Left Shift**: Fly down (creative mode) (Rebindable)
 - **Left Click**: Break block
 - **Right Click**: Place block
-- **1-5 or Scroll Wheel**: Select block type (Grass, Dirt, Stone, Wood, Leaves)
+- **1-9, 0 or Scroll Wheel**: Select block type (Grass, Dirt, Stone, Wood, Leaves, Sand, Glass, Brick, Plank, Water)
+- **R**: Cycle weather (Sunny → Rain → Snow)
 - **Settings Menu**: Click "Settings" in top-right to rebind controls
 
 ## Installation
@@ -71,7 +75,8 @@ Detailed documentation is available in the `docs/` directory:
 - `world.js`: Chunk management, world generation, and mesh handling.
 - `player.js`: Player movement, physics, and collision detection.
 - `noise.js`: Perlin noise generator and seeded random number generator.
-- `greedy-mesh.js`: Greedy meshing algorithm for optimization.
+- `greedy-mesh.js`: Greedy meshing algorithm for optimization with half-height block support.
+- `weather.js`: Weather system with particle effects, snow accumulation, and melting.
 
 ## Performance Optimizations
 
@@ -81,6 +86,7 @@ The game includes several GPU-optimized rendering techniques:
 - **Greedy Meshing**: Adjacent block faces are combined into single geometries, reducing vertex count.
 - **Face Culling**: Hidden faces (between blocks) are not rendered.
 - **Shared Geometry**: Blocks of the same type in a chunk share a single mesh.
+- **Half-Height Blocks**: Support for decorative half-height blocks (like snow) with proper rendering and collision.
 
 ## License
 

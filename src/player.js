@@ -137,11 +137,18 @@ export class Player {
                 // Check from player's feet down to 30 blocks below
                 for (let y = Math.floor(feetY) + 1; y >= Math.floor(feetY) - 30; y--) {
                     if (this.world.isBlockAt(x, y, z)) {
-                        const blockTop = y + 0.5;
+                        // Get block to check if it's half-height
+                        const block = this.world.getBlock(x, y, z);
+                        const isHalfHeight = block && this.world.halfHeightBlocks && this.world.halfHeightBlocks.has(block.type);
+                        // Block occupies [y, y+1) for full blocks, [y, y+0.5) for half-height
+                        const blockTop = y + (isHalfHeight ? 0.5 : 1);
                         
                         // Check if player's feet are within horizontal bounds of this block
-                        const dx = Math.abs(position.x - x);
-                        const dz = Math.abs(position.z - z);
+                        // Block occupies [x, x+1) so its center is at x + 0.5
+                        const blockCenterX = x + 0.5;
+                        const blockCenterZ = z + 0.5;
+                        const dx = Math.abs(position.x - blockCenterX);
+                        const dz = Math.abs(position.z - blockCenterZ);
                         
                         if (dx < 0.5 + this.radius && dz < 0.5 + this.radius) {
                             // This block is under the player
@@ -184,18 +191,25 @@ export class Player {
             for (let y = bodyMinY; y <= bodyMaxY + 1; y++) {
                 for (let z = pz - 1; z <= pz + 1; z++) {
                     if (this.world.isBlockAt(x, y, z)) {
-                        const blockCenter = new THREE.Vector3(x, y, z);
-                        const dx = position.x - blockCenter.x;
-                        const dz = position.z - blockCenter.z;
+                        // Block occupies [x, x+1) so center is at x + 0.5
+                        const blockCenterX = x + 0.5;
+                        const blockCenterZ = z + 0.5;
+                        const dx = position.x - blockCenterX;
+                        const dz = position.z - blockCenterZ;
                         const horizontalDist = Math.sqrt(dx * dx + dz * dz);
                         
                         // Check if player body intersects with block horizontally
                         if (horizontalDist < this.radius + 0.5) {
+                            // Get block to check if it's half-height
+                            const block = this.world.getBlock(x, y, z);
+                            const isHalfHeight = block && this.world.halfHeightBlocks && this.world.halfHeightBlocks.has(block.type);
+                            const blockTopY = y + (isHalfHeight ? 0.5 : 1);
+                            
                             // Check if player body height overlaps with block
-                            if (position.y > y - 0.5 && feetY < y + 0.5) {
+                            if (position.y > y && feetY < blockTopY) {
                                 return {
                                     collision: true,
-                                    block: blockCenter,
+                                    block: new THREE.Vector3(blockCenterX, y + (isHalfHeight ? 0.25 : 0.5), blockCenterZ),
                                     type: 'horizontal'
                                 };
                             }
@@ -316,9 +330,9 @@ export class Player {
             const spawnZ = 0;
             const highestBlock = this.world.getHighestBlockAt(spawnX, spawnZ);
             if (highestBlock >= 0) {
-                // Block center is at highestBlock, top is at highestBlock + 0.5
+                // Block occupies [y, y+1), so top is at highestBlock + 1
                 // Player feet should be at top, so player center = top + height
-                position.set(spawnX, highestBlock + 0.5 + this.height, spawnZ);
+                position.set(spawnX, highestBlock + 1 + this.height, spawnZ);
             } else {
                 position.set(0, 10, 0);
             }
