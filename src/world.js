@@ -35,8 +35,19 @@ export class World {
             dirt: new THREE.MeshLambertMaterial({ color: 0x8b7355 }),
             stone: new THREE.MeshLambertMaterial({ color: 0x888888 }),
             wood: new THREE.MeshLambertMaterial({ color: 0x8b5a2b }),
-            leaves: new THREE.MeshLambertMaterial({ color: 0x2d5016, transparent: true, opacity: 0.8 })
+            leaves: new THREE.MeshLambertMaterial({ color: 0x2d5016, transparent: true, opacity: 0.8 }),
+            sand: new THREE.MeshLambertMaterial({ color: 0xe1c699 }),
+            glass: new THREE.MeshLambertMaterial({ color: 0x88ccff, transparent: true, opacity: 0.4 }),
+            brick: new THREE.MeshLambertMaterial({ color: 0xb54b35 }),
+            plank: new THREE.MeshLambertMaterial({ color: 0xa07040 }),
+            water: new THREE.MeshLambertMaterial({ color: 0x0064ff, transparent: true, opacity: 0.6 }),
+            snow: new THREE.MeshLambertMaterial({ color: 0xffffff }),
+            ornament_red: new THREE.MeshLambertMaterial({ color: 0xff0000 }),
+            ornament_blue: new THREE.MeshLambertMaterial({ color: 0x0000ff }),
+            ornament_gold: new THREE.MeshLambertMaterial({ color: 0xffd700 })
         };
+        
+        this.transparentBlocks = new Set(['leaves', 'glass', 'water', 'ornament_red', 'ornament_blue', 'ornament_gold']);
         
         // Initial generation will happen via updateChunks
         console.log(`World initialized with seed: ${this.seed}`);
@@ -80,6 +91,7 @@ export class World {
         
         const baseHeight = 8;
         const heightVariation = 12;
+        const seaLevel = 4;
 
         // Generate base terrain
         for (let x = startX; x < endX; x++) {
@@ -98,15 +110,30 @@ export class World {
                     if (y === 0) type = 'stone';
                     else if (y < finalHeight - 3) type = 'stone';
                     else if (y < finalHeight - 1) type = 'dirt';
-                    else type = 'grass';
+                    else {
+                        if (y <= seaLevel + 1) type = 'sand';
+                        else type = 'grass';
+                    }
                     
                     // Force set for terrain (overwrites anything that spilled over, which is usually fine)
                     this.setBlockData(x, y, z, type);
                 }
+                
+                // Water filling
+                for (let y = finalHeight; y <= seaLevel; y++) {
+                    // Don't overwrite terrain
+                    if (!this.isBlockAt(x, y, z)) {
+                        this.setBlockData(x, y, z, 'water');
+                    }
+                }
 
                 // Trees
-                if (finalHeight > 3 && chunkRandom.next() < 0.015) {
-                    this.generateTree(x, finalHeight, z, chunkRandom);
+                if (finalHeight > seaLevel + 1 && chunkRandom.next() < 0.015) {
+                    if (chunkRandom.next() < 0.2) {
+                        this.generateChristmasTree(x, finalHeight, z, chunkRandom);
+                    } else {
+                        this.generateTree(x, finalHeight, z, chunkRandom);
+                    }
                 }
             }
         }
@@ -149,6 +176,48 @@ export class World {
         if (!this.blocks.has(key)) {
             this.blocks.set(key, { x, y, z, type });
         }
+    }
+    
+    generateChristmasTree(x, y, z, random) {
+        const trunkHeight = 4 + random.nextInt(0, 3);
+        
+        // Trunk
+        for (let i = 0; i < trunkHeight; i++) {
+            this.addBlockData(x, y + i, z, 'wood');
+        }
+        
+        // Leaves (Cone shape)
+        const leavesStart = y + 2;
+        const leavesHeight = trunkHeight + 2;
+        
+        for (let ly = 0; ly < leavesHeight; ly++) {
+            const currentY = leavesStart + ly;
+            // Radius gets smaller as we go up
+            const radius = Math.floor(2.5 - (ly / leavesHeight) * 2.5);
+            
+            for (let dx = -radius; dx <= radius; dx++) {
+                for (let dz = -radius; dz <= radius; dz++) {
+                    // Circular check
+                    if (dx*dx + dz*dz <= radius*radius + 1) {
+                        // Don't overwrite trunk
+                        if (!this.isBlockAt(x + dx, currentY, z + dz)) {
+                            let blockType = 'leaves';
+                            // Chance for ornaments
+                            if (random.next() < 0.15) {
+                                const rand = random.next();
+                                if (rand < 0.33) blockType = 'ornament_red';
+                                else if (rand < 0.66) blockType = 'ornament_blue';
+                                else blockType = 'ornament_gold';
+                            }
+                            this.addBlockData(x + dx, currentY, z + dz, blockType);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Star on top
+        this.addBlockData(x, leavesStart + leavesHeight, z, 'ornament_gold');
     }
     
     generateTree(x, y, z, random) {
@@ -231,9 +300,24 @@ export class World {
 
         // Build meshes
         blocksByType.forEach((typeBlocks, type) => {
-            // Use neighbor check to cull against blocks in other chunks
+            // Smart neighbor check handling transparency
             const neighborCheck = (nx, ny, nz) => {
-                return this.isBlockAt(nx, ny, nz);
+                const neighborBlock = this.getBlock(nx, ny, nz);
+                
+                // If no neighbor (empty space), face is visible -> Keep it
+                if (!neighborBlock) return false;
+                
+                // If neighbor is same type, cull face (internal face) -> Hide it
+                if (neighborBlock.type === type) return true;
+                
+                // If neighbor is opaque, it blocks view -> Hide face
+                // (Unless current block is also opaque? No, opaque vs opaque is covered by neighborBlock logic mostly, 
+                // but strictly: Stone vs Dirt -> Stone face hidden by Dirt? Yes.)
+                if (!this.transparentBlocks.has(neighborBlock.type)) return true;
+                
+                // If neighbor is transparent (and different type), we can see through it -> Keep face
+                // e.g. Water next to Glass -> Show Water face
+                return false;
             };
 
             const geometry = GreedyMesher.createMeshGeometry(typeBlocks, this.blockSize, neighborCheck);
