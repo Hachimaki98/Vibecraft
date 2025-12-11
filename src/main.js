@@ -164,7 +164,6 @@ class Game {
         const settingsButton = document.getElementById('settings-button');
         const settingsMenu = document.getElementById('settings-menu');
         const closeSettings = document.getElementById('close-settings');
-        const controlsList = document.getElementById('controls-list');
 
         // Toggle settings menu
         settingsButton.addEventListener('click', () => {
